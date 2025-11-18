@@ -1,0 +1,16 @@
+Balanced FairFace Dataset for Adversarial Robustness Study
+======================================================================
+
+Total images: 621
+Number of races: 7
+Images per race: ~90 (5 male + 5 female × 9 age ranges)
+
+Race Breakdown:
+----------------------------------------------------------------------
+East_Asian          : 90 images (45M / 45F)
+Indian              : 90 images (45M / 45F)
+Black               : 90 images (45M / 45F)
+White               : 90 images (45M / 45F)
+Middle_Eastern      : 87 images (45M / 42F)
+Latino_Hispanic     : 84 images (41M / 43F)
+Southeast_Asian     : 90 images (45M / 45F)
