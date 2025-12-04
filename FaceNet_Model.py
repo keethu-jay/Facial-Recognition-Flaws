@@ -44,11 +44,17 @@ def get_facenet_model():
         from keras_facenet import FaceNet
         model = FaceNet()
         print("✓ FaceNet model loaded successfully using keras-facenet library.")
+        # Test that it works
+        import numpy as np
+        test_input = np.random.rand(1, 160, 160, 3).astype(np.float32)
+        _ = model.embeddings(test_input)
         return model
     except ImportError:
         print("Note: keras-facenet not installed. Install with: pip install keras-facenet")
     except Exception as e:
         print(f"Warning: Could not load using keras-facenet: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Method 3: Try loading from frozen graph (original David Sandberg format)
     if os.path.exists(FROZEN_GRAPH_PATH):
@@ -78,19 +84,75 @@ def get_facenet_model():
     return None
 
 
-def get_face_embedding(model, image_tensor):
+def get_face_embedding(model, image_input):
     """
     Get face embedding from FaceNet model.
     
     Args:
-        model: FaceNet model
-        image_tensor: Preprocessed image tensor (batch_size, height, width, channels)
+        model: FaceNet model (keras-facenet FaceNet object or Keras model)
+        image_input: PIL Image, numpy array, or tensor
     
     Returns:
-        Tensor: Face embedding vector
+        Tensor/Array: Face embedding vector
     """
-    # FaceNet outputs a 512-dimensional embedding vector
-    # This represents the face in the embedding space
-    embedding = model(image_tensor)
+    import numpy as np
+    from PIL import Image as PILImage
+    
+    # Check if it's a keras-facenet FaceNet object
+    if hasattr(model, 'embeddings'):
+        # keras-facenet expects PIL Images or numpy arrays (not tensors)
+        # It handles face detection, alignment, and preprocessing internally
+        
+        # Convert to numpy array if needed
+        if isinstance(image_input, PILImage.Image):
+            # PIL Image - convert to numpy array (RGB format)
+            img_array = np.array(image_input.convert('RGB'))
+        elif isinstance(image_input, np.ndarray):
+            # Already numpy array - ensure it's uint8
+            img_array = image_input.copy()
+            if img_array.dtype != np.uint8:
+                if img_array.max() <= 1.0:
+                    img_array = (img_array * 255).astype(np.uint8)
+                else:
+                    img_array = img_array.astype(np.uint8)
+        elif isinstance(image_input, tf.Tensor):
+            # TensorFlow tensor - convert to numpy
+            img_array = image_input.numpy()
+            if len(img_array.shape) == 4:  # Remove batch dimension if present
+                img_array = img_array[0]
+            # Convert from [0,1] to [0,255] if needed
+            if img_array.max() <= 1.0:
+                img_array = (img_array * 255).astype(np.uint8)
+            else:
+                img_array = img_array.astype(np.uint8)
+        else:
+            # Try to convert to numpy
+            img_array = np.array(image_input)
+            if img_array.dtype != np.uint8:
+                img_array = img_array.astype(np.uint8)
+        
+        # keras-facenet expects a list of images (numpy arrays)
+        embedding = model.embeddings([img_array])
+        
+        # Remove list dimension (keras-facenet returns list)
+        if isinstance(embedding, list):
+            embedding = embedding[0]
+    else:
+        # Assume it's a standard Keras model - needs tensor input
+        if not isinstance(image_input, tf.Tensor):
+            # Convert to tensor
+            if isinstance(image_input, PILImage.Image):
+                img_array = np.array(image_input)
+            else:
+                img_array = np.array(image_input)
+            image_input = tf.convert_to_tensor(img_array)
+        embedding = model(image_input)
+    
+    # Convert to numpy if it's a tensor
+    if hasattr(embedding, 'numpy'):
+        embedding = embedding.numpy()
+    elif isinstance(embedding, tf.Tensor):
+        embedding = embedding.numpy()
+    
     return embedding
 
