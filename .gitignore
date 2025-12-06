@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dataset files (too large for GitHub)
+Datasets/*.pkl
+Datasets/*/*.jpg
+Datasets/*/*.png
+Datasets/*/*.jpeg
+Datasets/*.txt
+Datasets/*/FGSM/
+Datasets/*/PGD/
+Datasets/*/CW/
+Datasets/FGSM/
+Datasets/PGD/
+Datasets/CW/
+
+# Model files
+models/
+*.h5
+*.pb
+*.ckpt
+*.pth
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
