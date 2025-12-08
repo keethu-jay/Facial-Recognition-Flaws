@@ -1,0 +1,9 @@
+# Core dependencies for data preparation and preprocessing
+datasets>=2.14.0
+Pillow>=9.0.0
+numpy>=1.21.0
+
+# Optional: For FaceNet model (if using white-box attacks)
+# tensorflow>=2.10.0
+# keras-facenet>=0.3.0
+

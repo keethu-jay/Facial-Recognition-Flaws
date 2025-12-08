@@ -1,7 +1,21 @@
 """
 Data Preparation Script for Demographic Fairness in Adversarial Robustness
-Creates balanced dataset: 7 races × 90 images = 630 total images
-Each race: 9 age ranges × (5 male + 5 female) = 90 images
+
+This script downloads the FairFace dataset from Hugging Face and creates balanced
+demographic datasets organized by race, gender, and age groups.
+
+Dataset Structure:
+- 7 races: East_Asian, Indian, Black, White, Middle_Eastern, Latino_Hispanic, Southeast_Asian
+- 9 age ranges: 0-2, 3-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69, 70+
+- 2 genders: Male, Female
+- Target: ~90 images per race (5 male + 5 female per age range)
+
+Output:
+- Saves 7 pickle files (one per race) containing image data and metadata
+- Creates race-specific directories with individual image files
+- Generates dataset_metadata.txt with summary statistics
+
+Author: Responsible AI Project Team
 """
 
 import os
@@ -49,8 +63,7 @@ SAMPLES_PER_AGE_GENDER = 5
 # 9 age ranges with 10 images from each range
 TARGET_IMAGES_PER_RACE = 90
 
-# --- Helper to determine the path to the 'datasets' folder ---
-# Assuming the script is in datasets/data_prep.py, output folder is './datasets'
+# Output directory: saves datasets in the same directory as this script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = SCRIPT_DIR
 
@@ -64,11 +77,11 @@ def download_fairface():
     print("=" * 70)
     print("This may take a few minutes...")
 
-    # load dataset
+    # Load dataset from Hugging Face
     dataset = load_dataset("HuggingFaceM4/FairFace", '0.25')
 
-    #use validation split for testing (10,984 images)
-    # Question: why use the validation dataset?
+    # Use validation split for testing (10,984 images)
+    # Validation split provides a good balance of size and diversity
     val_data = dataset['validation']
     print(f"✓ Dataset downloaded successfully!")
     print(f"  Total validation images: {len(val_data)}")
@@ -86,10 +99,10 @@ def organize_by_demographics(val_data):
     print("STEP 2: Organizing Data by Demographics")
     print("=" * 70)
 
-    # Question: what does defaultdict do here and how is the lambda used?
+    # Create nested dictionary structure: organized_data[race][age][gender] = list of images
+    # defaultdict automatically creates nested dictionaries when accessing new keys
     organized_data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-    # FIX: The following block was missing an indentation to be inside the loop
     for idx, example in enumerate(val_data):
         # Get demographic labels
         race_label = example['race']
@@ -113,13 +126,10 @@ def organize_by_demographics(val_data):
             'age_label': age_label
         }
 
-        # FIX: The indices for organizing were reversed in the original code. Should be [race][gender][age]
-        # based on the original structure or a slightly different structure to match the prompt.
-        # Sticking to the structure in the comment: [race][gender][age]
+        # Organize by race, then age, then gender
         organized_data[race][age][gender].append(image_data)
 
-    # Print organization summary
-    # Question: what is being printed here aside from a confirmation and summary of data, is it sample images from the dataset?
+    # Print organization summary showing count of images per demographic group
     print("\n✓ Data organized by demographics")
     print("\nAvailable images per demographic group:")
     print("-" * 70)
@@ -138,7 +148,6 @@ def organize_by_demographics(val_data):
 
 
 # Create balanced datasets
-# Question: How do i split these into 7 seperate datasets
 def create_balanced_dataset(organized_data, samples_per_group=5):
     """
     Create balanced datasets: 90 images per race
@@ -172,12 +181,11 @@ def create_balanced_dataset(organized_data, samples_per_group=5):
                 available = organized_data[race][age][gender]
 
                 if len(available) < samples_per_group:
-                    # if there aren't enough images, just take all the available
+                    # If there aren't enough images, take all available
                     selected = available
                     warnings.append(
                         f"⚠ {race}, {age}, {gender}: only {len(available)}/{samples_per_group} images available"
                     )
-                # FIX: Corrected indentation for else block
                 else:
                     # Randomly sample the required number
                     selected = random.sample(available, samples_per_group)
@@ -331,7 +339,6 @@ def verify_dataset(list_of_race_datasets):
         # Check 3: Gender balance
         male_count = sum(1 for img in images if img['gender'] == 'Male')
         female_count = sum(1 for img in images if img['gender'] == 'Female')
-        # ratio check is often flawed due to rounding in real data, but we'll stick to a simple print
         print(f"  Gender: {male_count}M / {female_count}F")
 
     if all_checks_passed:
