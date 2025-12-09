@@ -54,7 +54,7 @@ def load_dataset(race_name, dataset_dir=OUTPUT_DIR):
     with open(pickle_path, 'rb') as f:
         dataset = pickle.load(f)
     
-    print(f"✓ Loaded {race_name} dataset: {len(dataset[race_name])} images")
+    print(f"oaded {race_name} dataset: {len(dataset[race_name])} images")
     return dataset
 
 
@@ -238,7 +238,7 @@ def create_perturbed_dataset(race_name, perturbation_type, dataset_dir=OUTPUT_DI
         
         perturbed_data.append(perturbed_image_data)
     
-    print(f"\n✓ Completed {perturbation_type} perturbation for {race_name}")
+    print(f"\nCompleted {perturbation_type} perturbation for {race_name}")
     
     # Return in same format as original
     return {race_name: perturbed_data}
