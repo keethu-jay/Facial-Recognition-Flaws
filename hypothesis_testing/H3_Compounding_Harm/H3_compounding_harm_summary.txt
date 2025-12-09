@@ -1,0 +1,22 @@
+
+COMPOUNDING HARM ANALYSIS RESULTS
+==================================
+
+Baseline FAR Disparity:
+  Ratio: 5.00:1
+  Most Vulnerable: East_Asian (FAR = 0.4444)
+  Least Vulnerable: White (FAR = 0.0889)
+
+Adversarial ASR Disparity (PGD, eps=0.03):
+  Ratio: 1.25:1
+  Most Vulnerable: Black (ASR = 0.8333)
+  Least Vulnerable: East_Asian (ASR = 0.6667)
+
+CONCLUSION:
+[NO] Harm is NOT compounded
+  The adversarial attack does not increase 
+  the existing demographic disparity.
+  
+  Baseline disparity: 5.00:1
+  Adversarial disparity: 1.25:1
+  Change: -75.0%

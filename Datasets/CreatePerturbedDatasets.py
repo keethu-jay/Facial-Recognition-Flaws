@@ -4,6 +4,20 @@ Script to create three perturbed versions of each demographic dataset using whit
 This script requires FaceNet model to compute gradients for FGSM, PGD, and C&W attacks.
 Each attack is a white-box attack that needs access to the model's gradients.
 
+MODEL SOURCE AND ATTRIBUTION:
+=============================
+FaceNet Model: Uses keras-facenet library (open-source)
+- Library: keras-facenet (version 0.3.2)
+- Repository: https://github.com/SergeyDmitriev/keras-facenet
+- Pre-trained weights: Automatically downloaded from library repository
+- Architecture: Inception ResNet v1 trained on VGGFace2 dataset
+- Embedding dimension: 512
+- Input size: 160x160 pixels
+- See MODEL_DOCUMENTATION.md for full attribution and references
+
+NO MODIFICATIONS were made to the FaceNet model itself. We use the model as-is
+from the keras-facenet library. Only wrapper functions were created for convenience.
+
 Attacks:
 - FGSM (Fast Gradient Sign Method): Single-step attack
 - PGD (Projected Gradient Descent): Iterative attack with projection
@@ -11,6 +25,8 @@ Attacks:
 
 The goal: Create perturbed versions where FaceNet might misidentify two different
 people (same race, gender, age) as the same person.
+
+See CREATE_PERTURBED_DATASETS_GUIDE.md for detailed usage instructions.
 """
 
 import os
@@ -165,7 +181,24 @@ def fgsm_attack(model, image_tensor, target_embedding, epsilon=0.01):
         tape.watch(image_tensor)
         
         # Get the embedding from FaceNet for the current (potentially perturbed) image
+        # This will return a tensor (not numpy) since image_tensor is a Variable
         current_embedding = get_face_embedding(model, image_tensor)
+        
+        # Ensure embeddings have compatible shapes
+        # current_embedding might be (1, 512) or (512,), target_embedding should match
+        if len(current_embedding.shape) == 2:
+            # Remove batch dimension if present - use tf.squeeze to preserve gradients
+            current_embedding = tf.squeeze(current_embedding, axis=0)
+        
+        # Ensure target_embedding is a tensor with matching shape
+        if isinstance(target_embedding, tf.Tensor):
+            if len(target_embedding.shape) == 2:
+                target_embedding = tf.squeeze(target_embedding, axis=0)
+        else:
+            # Convert to tensor if it's numpy
+            target_embedding = tf.convert_to_tensor(target_embedding, dtype=tf.float32)
+            if len(target_embedding.shape) == 2:
+                target_embedding = tf.squeeze(target_embedding, axis=0)
         
         # Calculate loss: we want to minimize the distance between current and target embedding
         # This makes FaceNet think the perturbed image is similar to the target
@@ -685,6 +718,13 @@ def main():
     
     # Load FaceNet model
     print("Loading FaceNet model...")
+    print("\nModel Source Information:")
+    print("  Library: keras-facenet (open-source)")
+    print("  Repository: https://github.com/SergeyDmitriev/keras-facenet")
+    print("  Architecture: Inception ResNet v1 (trained on VGGFace2)")
+    print("  Weights: Automatically downloaded from library repository")
+    print("  See MODEL_DOCUMENTATION.md for full attribution\n")
+    
     model = get_facenet_model()
     
     if model is None:
