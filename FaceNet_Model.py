@@ -30,11 +30,20 @@ def get_facenet_model():
     Returns:
         tf.keras.Model: The loaded FaceNet model, or None if loading fails
     """
+    # Helper function to safely print Unicode characters on Windows
+    def safe_print(msg):
+        try:
+            print(msg)
+        except UnicodeEncodeError:
+            # Replace Unicode characters with ASCII equivalents for Windows
+            msg_ascii = msg.replace('✓', '[OK]').replace('✗', '[ERROR]')
+            print(msg_ascii)
+    
     # Method 1: Try loading from H5 file (if you have converted weights)
     if os.path.exists(WEIGHTS_PATH):
         try:
             model = keras.models.load_model(WEIGHTS_PATH, compile=False)
-            print("✓ FaceNet model loaded successfully from H5 file.")
+            safe_print("✓ FaceNet model loaded successfully from H5 file.")
             return model
         except Exception as e:
             print(f"Warning: Could not load from H5 file: {e}")
@@ -42,22 +51,19 @@ def get_facenet_model():
     # Method 2: Try using keras-facenet library (recommended)
     try:
         from keras_facenet import FaceNet
-        try:
-            model = FaceNet()
-            print("✓ FaceNet model loaded successfully using keras-facenet library.")
-            return model
-        except Exception as e:
-            error_msg = str(e).lower()
-            if "download" in error_msg or "network" in error_msg or "connection" in error_msg:
-                print(f"Warning: Could not download FaceNet model: {e}")
-                print("This might be due to network issues. The model will be downloaded on first use.")
-                print("Please check your internet connection and try again.")
-            else:
-                print(f"Warning: Could not load using keras-facenet: {e}")
+        model = FaceNet()
+        safe_print("✓ FaceNet model loaded successfully using keras-facenet library.")
+        # Test that it works
+        import numpy as np
+        test_input = np.random.rand(1, 160, 160, 3).astype(np.float32)
+        _ = model.embeddings(test_input)
+        return model
     except ImportError:
         print("Note: keras-facenet not installed. Install with: pip install keras-facenet")
     except Exception as e:
         print(f"Warning: Could not load using keras-facenet: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Method 3: Try loading from frozen graph (original David Sandberg format)
     if os.path.exists(FROZEN_GRAPH_PATH):
@@ -71,14 +77,14 @@ def get_facenet_model():
             with tf.Graph().as_default() as graph:
                 tf.import_graph_def(graph_def, name='')
             
-            print("✓ FaceNet frozen graph loaded successfully.")
+            safe_print("✓ FaceNet frozen graph loaded successfully.")
             print("Note: You'll need to use tf.compat.v1.Session to run this model.")
             return graph
         except Exception as e:
             print(f"Warning: Could not load frozen graph: {e}")
     
     # If all methods fail
-    print("\n✗ Error: Could not load FaceNet model.")
+    safe_print("\n✗ Error: Could not load FaceNet model.")
     print("\nPlease ensure one of the following:")
     print("1. Install keras-facenet: pip install keras-facenet")
     print("2. Download FaceNet weights and place in models/ directory")
@@ -87,47 +93,151 @@ def get_facenet_model():
     return None
 
 
-def get_face_embedding(model, image_tensor):
+def get_face_embedding(model, image_input):
     """
     Get face embedding from FaceNet model.
     
     Args:
-        model: FaceNet model (can be keras-facenet FaceNet object or Keras model)
-        image_tensor: Preprocessed image tensor (batch_size, height, width, channels)
+        model: FaceNet model (keras-facenet FaceNet object or Keras model)
+        image_input: PIL Image, numpy array, or tensor
     
     Returns:
-        Tensor: Face embedding vector
+        Tensor/Array: Face embedding vector
     """
-    # Check if this is a keras-facenet FaceNet object
-    # The keras-facenet FaceNet object wraps the actual Keras model in a .model attribute
-    model_type = type(model).__name__
+    import numpy as np
+    from PIL import Image as PILImage
     
-    # Check for keras-facenet FaceNet object (has .model attribute with the actual Keras model)
-    if hasattr(model, 'model'):
-        try:
-            actual_model = model.model
-            if actual_model is not None:
-                # Use the underlying Keras model
-                embedding = actual_model(image_tensor, training=False)
-                return embedding
-        except Exception as e:
-            # If .model access fails, fall through to other methods
-            pass
+    # Check if it's a keras-facenet FaceNet object
+    if hasattr(model, 'embeddings'):
+        # For tensors (needed for gradient computation in attacks), use the underlying model directly
+        if isinstance(image_input, tf.Tensor) or isinstance(image_input, tf.Variable):
+            # Use the underlying Keras model for gradient computation
+            # The underlying model expects normalized input [0, 1] with shape (batch, 160, 160, 3)
+            if hasattr(model, 'model'):
+                # Ensure tensor is in correct format [0, 1] range
+                # The tensor from preprocess_image is already in [0, 1] range with batch dimension
+                try:
+                    if len(image_input.shape) == 4:
+                        # Already has batch dimension - use directly
+                        embedding = model.model(image_input)
+                        # Keep batch dimension for now - will be handled in loss calculation
+                        # Shape will be (1, 512) or (batch, 512)
+                    elif len(image_input.shape) == 3:
+                        # Add batch dimension
+                        embedding = model.model(tf.expand_dims(image_input, 0))
+                        # Shape will be (1, 512)
+                    else:
+                        raise ValueError(f"Unexpected tensor shape: {image_input.shape}")
+                    
+                    # Validate embedding
+                    if embedding is None:
+                        raise ValueError("Model returned None embedding")
+                    
+                except Exception as e:
+                    raise ValueError(f"Failed to get embedding from underlying model: {e}")
+            else:
+                raise ValueError("keras-facenet model does not have underlying 'model' attribute")
+        else:
+            # For PIL Images or numpy arrays (no gradients needed), use embeddings() method
+            # keras-facenet expects PIL Images or numpy arrays (not tensors)
+            # It handles face detection, alignment, and preprocessing internally
+            
+            # Convert to numpy array if needed
+            if isinstance(image_input, PILImage.Image):
+                # PIL Image - convert to numpy array (RGB format)
+                img_array = np.array(image_input.convert('RGB'))
+            elif isinstance(image_input, np.ndarray):
+                # Already numpy array - ensure it's uint8
+                img_array = image_input.copy()
+                if img_array.dtype != np.uint8:
+                    if img_array.max() <= 1.0:
+                        img_array = (img_array * 255).astype(np.uint8)
+                    else:
+                        img_array = img_array.astype(np.uint8)
+            else:
+                # Try to convert to numpy
+                img_array = np.array(image_input)
+                if img_array.dtype != np.uint8:
+                    img_array = img_array.astype(np.uint8)
+            
+            # Validate and fix image array before passing to keras-facenet
+            if img_array.size == 0:
+                raise ValueError("Image array is empty")
+            
+            # Remove batch dimension if present (keras-facenet expects (H, W, 3))
+            if len(img_array.shape) == 4:
+                if img_array.shape[0] == 1:
+                    img_array = img_array[0]  # Remove batch dimension
+                else:
+                    raise ValueError(f"Batch dimension present but batch size > 1: {img_array.shape}")
+            
+            # Validate final shape
+            if len(img_array.shape) != 3:
+                raise ValueError(f"Invalid image shape: {img_array.shape}. Expected (H, W, 3) after processing")
+            if img_array.shape[2] != 3:
+                raise ValueError(f"Invalid number of channels: {img_array.shape[2]}. Expected 3 (RGB)")
+            if img_array.shape[0] == 0 or img_array.shape[1] == 0:
+                raise ValueError(f"Image has zero width or height: {img_array.shape}")
+            
+            # keras-facenet expects a list of images (numpy arrays)
+            # It handles face detection internally, which may fail for some images
+            try:
+                embedding = model.embeddings([img_array])
+            except Exception as e:
+                # If face detection fails, try resizing the image first
+                # Sometimes keras-facenet has issues with certain image sizes
+                if "resize" in str(e).lower() or "empty" in str(e).lower():
+                    # Try resizing to a standard size that keras-facenet expects
+                    from PIL import Image as PILImage
+                    pil_img = PILImage.fromarray(img_array)
+                    # Resize to a reasonable size if too small or too large
+                    if pil_img.size[0] < 160 or pil_img.size[1] < 160:
+                        pil_img = pil_img.resize((224, 224), PILImage.LANCZOS)
+                    elif pil_img.size[0] > 512 or pil_img.size[1] > 512:
+                        pil_img = pil_img.resize((224, 224), PILImage.LANCZOS)
+                    img_array = np.array(pil_img)
+                    try:
+                        embedding = model.embeddings([img_array])
+                    except Exception as e2:
+                        raise ValueError(f"Failed to get embedding after resize: {e2}. Original error: {e}")
+                else:
+                    raise
+            
+            # Remove list dimension (keras-facenet returns list)
+            if isinstance(embedding, list):
+                if len(embedding) == 0:
+                    raise ValueError("Face detection failed: no embedding returned")
+                embedding = embedding[0]
+            
+            # Check if embedding is None (face detection may have failed)
+            if embedding is None:
+                raise ValueError("Face detection failed: embedding is None. The image may not contain a detectable face.")
+    else:
+        # Assume it's a standard Keras model - needs tensor input
+        if not isinstance(image_input, tf.Tensor):
+            # Convert to tensor
+            if isinstance(image_input, PILImage.Image):
+                img_array = np.array(image_input)
+            else:
+                img_array = np.array(image_input)
+            image_input = tf.convert_to_tensor(img_array)
+        embedding = model(image_input)
     
-    # Try direct call (for standard Keras models)
-    try:
-        embedding = model(image_tensor, training=False)
+    # For tensors (from model.model()), keep as tensor to preserve gradients
+    # For numpy arrays (from model.embeddings()), convert to numpy if needed
+    # Only convert to numpy if it's not needed for gradient computation
+    # We'll check the input type to decide
+    
+    # If input was a tensor/Variable, keep output as tensor (needed for gradients)
+    if isinstance(image_input, tf.Tensor) or isinstance(image_input, tf.Variable):
+        # Keep as tensor - don't convert to numpy
         return embedding
-    except TypeError:
-        # Some models don't accept training parameter
-        try:
-            embedding = model(image_tensor)
-            return embedding
-        except Exception as e:
-            raise ValueError(
-                f"Could not get embedding from model. "
-                f"Model type: {model_type}, "
-                f"Has .model attr: {hasattr(model, 'model')}, "
-                f"Error: {e}"
-            )
+    else:
+        # Input was PIL/numpy - convert to numpy for consistency
+        if isinstance(embedding, tf.Tensor):
+            embedding = embedding.numpy()
+        elif hasattr(embedding, 'numpy'):
+            embedding = embedding.numpy()
+    
+    return embedding
 
