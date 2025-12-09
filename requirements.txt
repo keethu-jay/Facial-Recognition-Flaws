@@ -3,7 +3,9 @@ datasets>=2.14.0
 Pillow>=9.0.0
 numpy>=1.21.0
 
-# Optional: For FaceNet model (if using white-box attacks)
-# tensorflow>=2.10.0
-# keras-facenet>=0.3.0
+# Required: For FaceNet model (needed for baseline evaluation and white-box attacks)
+tensorflow>=2.10.0
+scipy>=1.9.0
+opencv-python>=4.5.0
+keras-facenet>=0.3.0
 

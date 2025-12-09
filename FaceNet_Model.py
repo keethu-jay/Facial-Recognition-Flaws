@@ -42,9 +42,18 @@ def get_facenet_model():
     # Method 2: Try using keras-facenet library (recommended)
     try:
         from keras_facenet import FaceNet
-        model = FaceNet()
-        print("✓ FaceNet model loaded successfully using keras-facenet library.")
-        return model
+        try:
+            model = FaceNet()
+            print("✓ FaceNet model loaded successfully using keras-facenet library.")
+            return model
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "download" in error_msg or "network" in error_msg or "connection" in error_msg:
+                print(f"Warning: Could not download FaceNet model: {e}")
+                print("This might be due to network issues. The model will be downloaded on first use.")
+                print("Please check your internet connection and try again.")
+            else:
+                print(f"Warning: Could not load using keras-facenet: {e}")
     except ImportError:
         print("Note: keras-facenet not installed. Install with: pip install keras-facenet")
     except Exception as e:
@@ -83,14 +92,42 @@ def get_face_embedding(model, image_tensor):
     Get face embedding from FaceNet model.
     
     Args:
-        model: FaceNet model
+        model: FaceNet model (can be keras-facenet FaceNet object or Keras model)
         image_tensor: Preprocessed image tensor (batch_size, height, width, channels)
     
     Returns:
         Tensor: Face embedding vector
     """
-    # FaceNet outputs a 512-dimensional embedding vector
-    # This represents the face in the embedding space
-    embedding = model(image_tensor)
-    return embedding
+    # Check if this is a keras-facenet FaceNet object
+    # The keras-facenet FaceNet object wraps the actual Keras model in a .model attribute
+    model_type = type(model).__name__
+    
+    # Check for keras-facenet FaceNet object (has .model attribute with the actual Keras model)
+    if hasattr(model, 'model'):
+        try:
+            actual_model = model.model
+            if actual_model is not None:
+                # Use the underlying Keras model
+                embedding = actual_model(image_tensor, training=False)
+                return embedding
+        except Exception as e:
+            # If .model access fails, fall through to other methods
+            pass
+    
+    # Try direct call (for standard Keras models)
+    try:
+        embedding = model(image_tensor, training=False)
+        return embedding
+    except TypeError:
+        # Some models don't accept training parameter
+        try:
+            embedding = model(image_tensor)
+            return embedding
+        except Exception as e:
+            raise ValueError(
+                f"Could not get embedding from model. "
+                f"Model type: {model_type}, "
+                f"Has .model attr: {hasattr(model, 'model')}, "
+                f"Error: {e}"
+            )
 
