@@ -1,7 +1,7 @@
 """
 Baseline Evaluation Script for FaceNet Verification
 
-This script evaluates FaceNet's verification accuracy on clean (unperturbed) images.
+This script evaluates FaceNet's verification accuracy on unperturbed images.
 For each face in each dataset, it compares it with another face of the same gender
 and age range. If the distance calculated is greater than 1.0, FaceNet sees them as
 different people (correct for different people).
@@ -9,7 +9,6 @@ different people (correct for different people).
 Metrics Calculated:
 - Accuracy: Percentage of correct identifications (distance > 1.0 for different people)
 - False Acceptance Rate (FAR): Percentage of different people incorrectly identified as same (distance <= 1.0)
-- False Rejection Rate (FRR): Not applicable for different-person comparisons, but tracked for completeness
 
 Per-group metrics are computed for each race, and overall metrics across all races.
 """
@@ -74,9 +73,8 @@ def load_dataset(race_name, dataset_dir=DATASETS_DIR):
         dataset = pickle.load(f)
     
     # Extract the list of images from the dictionary
-    images = dataset[race_name]
-    print(f"✓ Loaded {race_name} dataset: {len(images)} images")
-    return images
+    print(f"Loaded {race_name} dataset: {len(dataset[race_name])} images")
+    return dataset[race_name]
 
 
 def preprocess_image(pil_image, target_size=(160, 160)):
@@ -225,8 +223,6 @@ def evaluate_race_dataset(race_name, model, dataset_dir=DATASETS_DIR):
     accuracy = correct_predictions / total_pairs if total_pairs > 0 else 0.0
     far = false_acceptances / total_pairs if total_pairs > 0 else 0.0
     
-    # FRR is not applicable here since we're comparing different people
-    # FRR would be relevant for same-person comparisons (false rejections)
     frr = 0.0  # Not applicable for different-person comparisons
     
     results = {
@@ -395,7 +391,7 @@ def main():
     try:
         model = get_facenet_model()
         if model is None:
-            print("\n✗ Error: Could not load FaceNet model.")
+            print("\nError: Could not load FaceNet model.")
             print("\nPlease ensure one of the following:")
             print("1. Install keras-facenet: pip install keras-facenet")
             print("   (This will automatically download the model on first use)")
@@ -407,7 +403,7 @@ def main():
             return
     except Exception as e:
         import traceback
-        print(f"\n✗ Error loading FaceNet model: {e}")
+        print(f"\nError loading FaceNet model: {e}")
         print("\nFull error traceback:")
         traceback.print_exc()
         print("\nPlease ensure one of the following:")
@@ -419,7 +415,7 @@ def main():
         print("      to ensure the model is downloaded and cached.")
         return
     
-    print("✓ FaceNet model loaded successfully\n")
+    print("FaceNet model loaded successfully\n")
     
     # Evaluate each race dataset
     all_results = []
@@ -430,11 +426,11 @@ def main():
             if result is not None:
                 all_results.append(result)
         except Exception as e:
-            print(f"✗ Error evaluating {race}: {e}")
+            print(f"Error evaluating {race}: {e}")
             continue
     
     if len(all_results) == 0:
-        print("\n✗ Error: No valid results generated. Please check dataset files.")
+        print("\nError: No valid results generated. Please check dataset files.")
         return
     
     # Calculate overall metrics
