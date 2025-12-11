@@ -29,3 +29,6 @@ If the adversarial disparity ratio is greater than the baseline ratio, it indica
 - **Harm Compounded**: Adversarial attacks increase existing demographic disparities
 - **Harm Not Compounded**: Adversarial attacks do not increase (or may reduce) existing disparities
 
+
+
+

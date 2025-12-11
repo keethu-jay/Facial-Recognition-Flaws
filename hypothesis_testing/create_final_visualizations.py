@@ -61,12 +61,15 @@ def load_adversarial_asr(attack_type, epsilon):
     return heatmap_data
 
 
-def create_heatmap(data, title, filename, vmin=None, vmax=None):
+def create_heatmap(data, title, filename, vmin=None, vmax=None, use_red_green=False):
     """Create a heatmap visualization"""
     fig, ax = plt.subplots(figsize=(14, 8))
     
+    # Use red-to-green colormap if specified, otherwise use default
+    cmap = 'RdYlGn_r' if use_red_green else COLOR_PALETTE
+    
     # Create heatmap
-    sns.heatmap(data, annot=True, fmt='.3f', cmap=COLOR_PALETTE,
+    sns.heatmap(data, annot=True, fmt='.3f', cmap=cmap,
                vmin=vmin, vmax=vmax, center=None,
                cbar_kws={'label': 'Rate'},
                linewidths=0.5, linecolor='gray',
@@ -100,7 +103,8 @@ def main():
         create_heatmap(
             baseline_heatmap,
             'Baseline False Acceptance Rate (FAR)\nby Race and Age Group',
-            'Baseline_FAR_Heatmap.png'
+            'Baseline_FAR_Heatmap.png',
+            use_red_green=True  # Use red-to-green colormap
         )
     except Exception as e:
         print(f"  ✗ Error: {e}")
